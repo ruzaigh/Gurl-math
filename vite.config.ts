@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  base: '/Gurl-math/',
   plugins: [
     react(),
     VitePWA({
@@ -16,7 +17,7 @@ export default defineConfig({
         background_color: '#F1F5FA',
         display: 'standalone',
         orientation: 'portrait-primary',
-        start_url: '/',
+        start_url: '/Gurl-math/',
         icons: [
           {
             src: 'icon.svg',
