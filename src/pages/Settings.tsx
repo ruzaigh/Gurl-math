@@ -1,5 +1,6 @@
 import type { AppState, Currency } from '../types';
 import { CURRENCIES } from '../utils';
+import { APP_VERSION, BUILD_DATE } from '../version';
 
 interface Props {
   state: AppState;
@@ -90,6 +91,7 @@ export function Settings({ state, update }: Props) {
         <p style={{ fontFamily: 'Fraunces, serif', fontSize: '16px', color: '#64748B', marginBottom: '4px' }}>girl math ✨</p>
         <p>Manual-first. No bank linking. No ads. No subscription.</p>
         <p>Your data never leaves this device.</p>
+        <p style={{ marginTop: '12px', fontSize: '11px', color: '#CBD5E1' }}>{APP_VERSION} · {BUILD_DATE}</p>
       </div>
     </div>
   );

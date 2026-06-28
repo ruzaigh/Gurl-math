@@ -15,6 +15,7 @@ import {
   Gem,
   Settings as SettingsIcon,
 } from 'lucide-react';
+import { APP_VERSION, BUILD_DATE } from './version';
 
 const NAV: { id: Page; label: string; Icon: React.ElementType }[] = [
   { id: 'overview', label: 'Overview', Icon: LayoutDashboard },
@@ -49,6 +50,10 @@ export default function App() {
             {label}
           </button>
         ))}
+        <div style={{ marginTop: 'auto', paddingTop: '24px', textAlign: 'center', color: '#CBD5E1', fontSize: '11px', lineHeight: 1.6 }}>
+          <div>{APP_VERSION}</div>
+          <div>{BUILD_DATE}</div>
+        </div>
       </aside>
 
       {/* Main content */}
