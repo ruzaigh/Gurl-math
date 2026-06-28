@@ -326,6 +326,25 @@ select.field-input { cursor: pointer; }
 .form-row { display: grid; gap: 14px; }
 .form-row-2 { grid-template-columns: 1fr 1fr; }
 
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 600px) {
+  .stat-grid { grid-template-columns: 1fr; }
+  .chart-grid { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 480px) {
   .form-row-2 { grid-template-columns: 1fr; }
   .modal-box { padding: 20px; }
