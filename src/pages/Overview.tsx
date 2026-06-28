@@ -1,4 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+
+const ACT_PAGE_SIZE = 5;
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   BarChart, Bar, XAxis, YAxis,
@@ -16,6 +18,7 @@ export function Overview({ state }: Props) {
   const { settings, accounts, assets, received, expenses, moves } = state;
   const { currency } = settings;
   const month = thisMonth();
+  const [actPage, setActPage] = useState(1);
 
   const stats = useMemo(() => {
     const totalSavings = accounts.reduce((s, a) => s + a.balance, 0);
@@ -55,7 +58,7 @@ export function Overview({ state }: Props) {
         const to   = accounts.find(a => a.id === mv.toId)?.name ?? '?';
         return { id: mv.id, date: mv.date, type: 'move' as const, label: `${from} → ${to}`, sub: 'Transfer', amount: mv.amount };
       }),
-    ].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 12);
+    ].sort((a, b) => b.date.localeCompare(a.date));
 
     return { netWorth, totalSavings, totalAssets, totalReceived, totalSpent, leftOver, donutData, barData, activity };
   }, [accounts, assets, received, expenses, moves, month]);
@@ -93,7 +96,7 @@ export function Overview({ state }: Props) {
       </div>
 
       {/* Stat tiles */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '20px' }}>
+      <div className="stat-grid">
         {([
           { label: 'Received',  amount: stats.totalReceived, Icon: ArrowDownLeft, color: '#16A34A', bg: '#DCFCE7' },
           { label: 'Spent',     amount: stats.totalSpent,    Icon: ArrowUpRight,  color: '#BE185D', bg: '#FCE7F3' },
@@ -118,7 +121,7 @@ export function Overview({ state }: Props) {
       </div>
 
       {/* Charts */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+      <div className="chart-grid">
         {/* Donut */}
         <div className="card">
           <p style={{ fontSize: '13px', fontWeight: 600, color: '#64748B', marginBottom: '12px' }}>Spending by Category</p>
@@ -183,30 +186,44 @@ export function Overview({ state }: Props) {
             <p style={{ fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>Nothing here yet</p>
             <p style={{ fontSize: '13px' }}>Start by logging some income or expenses.</p>
           </div>
-        ) : (
-          stats.activity.map(item => (
-            <div key={item.id} className="activity-row">
-              <div
-                className="activity-icon"
-                style={{ background: item.type === 'received' ? '#DCFCE7' : item.type === 'expense' ? '#FCE7F3' : '#DBEAFE', fontSize: '18px' }}
-              >
-                {item.type === 'received' ? '💚' : item.type === 'expense' ? '💸' : '🔄'}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '14px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {item.label}
+        ) : (() => {
+          const actTotal = Math.ceil(stats.activity.length / ACT_PAGE_SIZE);
+          const safePage = Math.min(actPage, actTotal);
+          const visible = stats.activity.slice((safePage - 1) * ACT_PAGE_SIZE, safePage * ACT_PAGE_SIZE);
+          return (
+            <>
+              {visible.map(item => (
+                <div key={item.id} className="activity-row">
+                  <div
+                    className="activity-icon"
+                    style={{ background: item.type === 'received' ? '#DCFCE7' : item.type === 'expense' ? '#FCE7F3' : '#DBEAFE', fontSize: '18px' }}
+                  >
+                    {item.type === 'received' ? '💚' : item.type === 'expense' ? '💸' : '🔄'}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '14px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {item.label}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#94A3B8' }}>{item.sub} · {displayDate(item.date)}</div>
+                  </div>
+                  <div
+                    className="money-text"
+                    style={{ fontSize: '15px', fontWeight: 700, flexShrink: 0, color: item.type === 'received' ? '#16A34A' : item.type === 'expense' ? '#BE185D' : '#2563EB' }}
+                  >
+                    {item.type === 'received' ? '+' : item.type === 'expense' ? '−' : ''}{fmt(item.amount, currency)}
+                  </div>
                 </div>
-                <div style={{ fontSize: '12px', color: '#94A3B8' }}>{item.sub} · {displayDate(item.date)}</div>
-              </div>
-              <div
-                className="money-text"
-                style={{ fontSize: '15px', fontWeight: 700, flexShrink: 0, color: item.type === 'received' ? '#16A34A' : item.type === 'expense' ? '#BE185D' : '#2563EB' }}
-              >
-                {item.type === 'received' ? '+' : item.type === 'expense' ? '−' : ''}{fmt(item.amount, currency)}
-              </div>
-            </div>
-          ))
-        )}
+              ))}
+              {actTotal > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid #F1F5FA' }}>
+                  <button className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '13px' }} onClick={() => setActPage(p => Math.max(1, p - 1))} disabled={safePage === 1}>← Prev</button>
+                  <span style={{ fontSize: '13px', color: '#64748B' }}>Page {safePage} of {actTotal}</span>
+                  <button className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '13px' }} onClick={() => setActPage(p => Math.min(actTotal, p + 1))} disabled={safePage === actTotal}>Next →</button>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );

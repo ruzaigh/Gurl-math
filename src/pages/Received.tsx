@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, ArrowDownLeft } from 'lucide-react';
+import { Plus, Trash2, Pencil, ArrowDownLeft } from 'lucide-react';
 import type { AppState, ReceivedEntry, IncomeCategory } from '../types';
 import { fmt, uid, TODAY, displayDate, thisMonth } from '../utils';
 import { Modal } from '../components/Modal';
@@ -18,15 +18,32 @@ const CAT_COLORS: Record<IncomeCategory, string> = {
 
 type Form = { amount: string; fromWhom: string; category: IncomeCategory; date: string; note: string; depositToId: string };
 
+const PAGE_SIZE = 8;
+
 export function Received({ state, update }: Props) {
   const { received, accounts, settings } = state;
   const { currency } = settings;
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState<Form>({ amount: '', fromWhom: '', category: 'Gift', date: TODAY, note: '', depositToId: '' });
 
+  // Edit state
+  const [editing, setEditing] = useState<ReceivedEntry | null>(null);
+  const [eAmt, setEAmt] = useState(0);
+  const [eDate, setEDate] = useState(TODAY);
+  const [eFrom, setEFrom] = useState('');
+  const [eCat, setECat] = useState<IncomeCategory>('Gift');
+  const [eNote, setENote] = useState('');
+  const [eDepositTo, setEDepositTo] = useState('');
+
+  // Pagination
+  const [page, setPage] = useState(1);
+
   const month = thisMonth();
   const monthTotal = received.filter(r => r.date.startsWith(month)).reduce((s, r) => s + r.amount, 0);
   const sorted = [...received].sort((a, b) => b.date.localeCompare(a.date));
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
+  const safePage = Math.min(page, Math.max(1, totalPages));
+  const visible = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   function openAdd() {
     setForm({ amount: '', fromWhom: '', category: 'Gift', date: TODAY, note: '', depositToId: '' });
@@ -46,11 +63,49 @@ export function Received({ state, update }: Props) {
     }
     update({ received: [entry, ...received], accounts: updatedAccounts });
     setShowAdd(false);
+    setPage(1);
   }
 
   function remove(id: string) {
     if (!confirm('Remove this entry?')) return;
     update({ received: received.filter(r => r.id !== id) });
+    setPage(1);
+  }
+
+  function openEdit(r: ReceivedEntry) {
+    setEditing(r);
+    setEAmt(r.amount);
+    setEDate(r.date);
+    setEFrom(r.fromWhom);
+    setECat(r.category);
+    setENote(r.note);
+    setEDepositTo(r.depositToId ?? '');
+  }
+
+  function saveEdit() {
+    if (!editing) return;
+    let updatedAccounts = [...accounts];
+    // Reverse old depositToId effect
+    if (editing.depositToId) {
+      updatedAccounts = updatedAccounts.map(a =>
+        a.id === editing.depositToId ? { ...a, balance: a.balance - editing.amount } : a
+      );
+    }
+    // Apply new depositToId effect
+    if (eDepositTo) {
+      updatedAccounts = updatedAccounts.map(a =>
+        a.id === eDepositTo ? { ...a, balance: a.balance + eAmt } : a
+      );
+    }
+    update({
+      received: state.received.map(r =>
+        r.id === editing.id
+          ? { ...editing, amount: eAmt, date: eDate, fromWhom: eFrom, category: eCat, note: eNote, depositToId: eDepositTo || undefined }
+          : r
+      ),
+      accounts: updatedAccounts,
+    });
+    setEditing(null);
   }
 
   return (
@@ -74,38 +129,50 @@ export function Received({ state, update }: Props) {
           <p style={{ fontSize: '13px' }}>Tap "Log Income" to record money you receive.</p>
         </div>
       ) : (
-        <div className="card" style={{ padding: '4px 20px' }}>
-          {sorted.map(entry => (
-            <div key={entry.id} className="activity-row">
-              <div className="activity-icon" style={{ background: '#DCFCE7' }}>
-                <ArrowDownLeft size={18} color="#16A34A" />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '14px', fontWeight: 600 }}>From {entry.fromWhom}</div>
-                <div style={{ fontSize: '12px', color: '#94A3B8', display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
-                  <span style={{
-                    background: `${CAT_COLORS[entry.category]}18`,
-                    color: CAT_COLORS[entry.category],
-                    padding: '1px 8px', borderRadius: '10px', fontWeight: 600,
-                  }}>{entry.category}</span>
-                  <span>{displayDate(entry.date)}</span>
-                  {entry.note && <span>· {entry.note}</span>}
-                  {entry.depositToId && (
-                    <span>· → {accounts.find(a => a.id === entry.depositToId)?.name ?? 'account'}</span>
-                  )}
+        <>
+          <div className="card" style={{ padding: '4px 20px' }}>
+            {visible.map(entry => (
+              <div key={entry.id} className="activity-row">
+                <div className="activity-icon" style={{ background: '#DCFCE7' }}>
+                  <ArrowDownLeft size={18} color="#16A34A" />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '14px', fontWeight: 600 }}>From {entry.fromWhom}</div>
+                  <div style={{ fontSize: '12px', color: '#94A3B8', display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
+                    <span style={{
+                      background: `${CAT_COLORS[entry.category]}18`,
+                      color: CAT_COLORS[entry.category],
+                      padding: '1px 8px', borderRadius: '10px', fontWeight: 600,
+                    }}>{entry.category}</span>
+                    <span>{displayDate(entry.date)}</span>
+                    {entry.note && <span>· {entry.note}</span>}
+                    {entry.depositToId && (
+                      <span>· → {accounts.find(a => a.id === entry.depositToId)?.name ?? 'account'}</span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                  <div className="money-text" style={{ fontSize: '16px', fontWeight: 700, color: '#16A34A' }}>
+                    +{fmt(entry.amount, currency)}
+                  </div>
+                  <button onClick={() => openEdit(entry)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: '4px', display: 'flex' }}>
+                    <Pencil size={14} />
+                  </button>
+                  <button onClick={() => remove(entry.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#CBD5E1', padding: '4px', display: 'flex' }}>
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                <div className="money-text" style={{ fontSize: '16px', fontWeight: 700, color: '#16A34A' }}>
-                  +{fmt(entry.amount, currency)}
-                </div>
-                <button onClick={() => remove(entry.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#CBD5E1', padding: '4px', display: 'flex' }}>
-                  <Trash2 size={14} />
-                </button>
-              </div>
+            ))}
+          </div>
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 4px 0' }}>
+              <button className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '13px' }} onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1}>← Prev</button>
+              <span style={{ fontSize: '13px', color: '#64748B' }}>Page {safePage} of {totalPages}</span>
+              <button className="btn btn-ghost" style={{ padding: '6px 12px', fontSize: '13px' }} onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages}>Next →</button>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       {showAdd && (
@@ -150,6 +217,53 @@ export function Received({ state, update }: Props) {
             )}
             <button className="btn btn-green" style={{ width: '100%', justifyContent: 'center' }} onClick={save}>
               Log Income
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {editing && (
+        <Modal title="Edit Income" onClose={() => setEditing(null)}>
+          <div className="form-row">
+            <div className="form-row form-row-2">
+              <div>
+                <label className="field-label">Amount ({currency})</label>
+                <input className="field-input" type="number" min="0" placeholder="0" value={eAmt}
+                  onChange={e => setEAmt(parseFloat(e.target.value) || 0)} />
+              </div>
+              <div>
+                <label className="field-label">Date</label>
+                <input className="field-input" type="date" value={eDate}
+                  onChange={e => setEDate(e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <label className="field-label">From Whom</label>
+              <input className="field-input" placeholder="e.g. Mom, Employer, Client" value={eFrom}
+                onChange={e => setEFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className="field-label">Category</label>
+              <select className="field-input" value={eCat} onChange={e => setECat(e.target.value as IncomeCategory)}>
+                {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="field-label">Note <span style={{ color: '#94A3B8', fontWeight: 400 }}>optional</span></label>
+              <input className="field-input" placeholder="Any extra details" value={eNote}
+                onChange={e => setENote(e.target.value)} />
+            </div>
+            {accounts.length > 0 && (
+              <div>
+                <label className="field-label">Deposit Into Account <span style={{ color: '#94A3B8', fontWeight: 400 }}>optional</span></label>
+                <select className="field-input" value={eDepositTo} onChange={e => setEDepositTo(e.target.value)}>
+                  <option value="">Don't deposit</option>
+                  {accounts.map(a => <option key={a.id} value={a.id}>{a.icon} {a.name}</option>)}
+                </select>
+              </div>
+            )}
+            <button className="btn btn-green" style={{ width: '100%', justifyContent: 'center' }} onClick={saveEdit}>
+              Save Changes
             </button>
           </div>
         </Modal>
