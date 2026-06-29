@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { Plus, Trash2, Pencil } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Plus, Trash2, Pencil, Camera } from 'lucide-react';
 import type { AppState, ExpenseEntry, ExpenseCategory } from '../types';
 import { fmt, uid, TODAY, displayDate, thisMonth, EXPENSE_COLORS, EXPENSE_CATEGORIES } from '../utils';
 import { Modal } from '../components/Modal';
+import { scanReceiptImage } from '../scanReceipt';
 
 interface Props {
   state: AppState;
@@ -27,6 +28,10 @@ export function Expenses({ state, update }: Props) {
   const [eNote, setENote] = useState('');
   const [ePayFrom, setEPayFrom] = useState('');
 
+  // Scan state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [scanStatus, setScanStatus] = useState<'idle' | 'reading' | 'done' | 'error'>('idle');
+
   // Pagination
   const [page, setPage] = useState(1);
 
@@ -39,7 +44,25 @@ export function Expenses({ state, update }: Props) {
 
   function openAdd() {
     setForm({ amount: '', category: 'Food', note: '', date: TODAY, payFromId: '' });
+    setScanStatus('idle');
     setShowAdd(true);
+  }
+
+  async function handleScan(file: File) {
+    setScanStatus('reading');
+    try {
+      const result = await scanReceiptImage(file);
+      setForm(f => ({
+        ...f,
+        amount: result.amount != null ? String(result.amount) : f.amount,
+        date: result.date ?? f.date,
+        note: result.note ?? f.note,
+        category: result.category ?? f.category,
+      }));
+      setScanStatus('done');
+    } catch {
+      setScanStatus('error');
+    }
   }
 
   function save() {
@@ -164,6 +187,33 @@ export function Expenses({ state, update }: Props) {
       {showAdd && (
         <Modal title="Log Expense" onClose={() => setShowAdd(false)}>
           <div className="form-row">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleScan(f); e.target.value = ''; }}
+            />
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ width: '100%', justifyContent: 'center', border: '1.5px dashed #E2EAF4', gap: '8px' }}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={scanStatus === 'reading'}
+            >
+              <Camera size={16} />
+              {scanStatus === 'reading' ? 'Reading receipt…' : 'Scan till slip'}
+            </button>
+            {scanStatus === 'done' && (
+              <p style={{ fontSize: '12px', color: '#16A34A', textAlign: 'center', margin: '0' }}>
+                ✓ Fields filled from receipt — check and adjust if needed
+              </p>
+            )}
+            {scanStatus === 'error' && (
+              <p style={{ fontSize: '12px', color: '#BE185D', textAlign: 'center', margin: '0' }}>
+                Could not read the receipt clearly — please fill in manually
+              </p>
+            )}
             <div className="form-row form-row-2">
               <div>
                 <label className="field-label">Amount ({currency})</label>
