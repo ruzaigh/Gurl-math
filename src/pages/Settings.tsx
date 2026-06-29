@@ -77,6 +77,23 @@ export function Settings({ state, update }: Props) {
       </div>
 
       <div className="card" style={{ marginBottom: '16px' }}>
+        <p style={{ fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Receipt Scanner</p>
+        <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '16px' }}>
+          Add a free Gemini API key to enable till slip scanning.{' '}
+          <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer"
+             style={{ color: '#BE185D' }}>Get a free key →</a>
+        </p>
+        <label className="field-label">Gemini API Key</label>
+        <input
+          className="field-input"
+          type="password"
+          placeholder="AIza..."
+          value={settings.geminiApiKey ?? ''}
+          onChange={e => set('geminiApiKey', e.target.value)}
+        />
+      </div>
+
+      <div className="card" style={{ marginBottom: '16px' }}>
         <p style={{ fontSize: '14px', fontWeight: 600, marginBottom: '6px' }}>Data & Backup</p>
         <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '20px' }}>
           Your data lives privately on this device. Export a backup regularly so you never lose it.

@@ -49,9 +49,11 @@ export function Expenses({ state, update }: Props) {
   }
 
   async function handleScan(file: File) {
+    const apiKey = state.settings.geminiApiKey;
+    if (!apiKey) { setScanStatus('error'); return; }
     setScanStatus('reading');
     try {
-      const result = await scanReceiptImage(file);
+      const result = await scanReceiptImage(file, apiKey);
       setForm(f => ({
         ...f,
         amount: result.amount != null ? String(result.amount) : f.amount,
@@ -194,26 +196,40 @@ export function Expenses({ state, update }: Props) {
               style={{ display: 'none' }}
               onChange={e => { const f = e.target.files?.[0]; if (f) handleScan(f); e.target.value = ''; }}
             />
-            <button
-              type="button"
-              className="btn btn-ghost"
-              style={{ width: '100%', justifyContent: 'center', border: '1.5px dashed #E2EAF4', gap: '8px' }}
-              onClick={() => fileInputRef.current?.click()}
-              disabled={scanStatus === 'reading'}
-            >
-              <Camera size={16} />
-              {scanStatus === 'reading' ? 'Reading receipt…' : 'Scan till slip'}
-            </button>
-            {scanStatus === 'done' && (
-              <p style={{ fontSize: '12px', color: '#16A34A', textAlign: 'center', margin: '0' }}>
-                ✓ Fields filled from receipt — check and adjust if needed
-              </p>
-            )}
-            {scanStatus === 'error' && (
-              <p style={{ fontSize: '12px', color: '#BE185D', textAlign: 'center', margin: '0' }}>
-                Could not read the receipt clearly — please fill in manually
-              </p>
-            )}
+            {(() => {
+              const hasKey = Boolean(state.settings.geminiApiKey);
+              return (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    style={{ width: '100%', justifyContent: 'center', border: '1.5px dashed #E2EAF4', gap: '8px' }}
+                    onClick={() => { if (hasKey) fileInputRef.current?.click(); }}
+                    disabled={scanStatus === 'reading' || !hasKey}
+                    title={!hasKey ? 'Add a Gemini API key in Settings to enable' : undefined}
+                  >
+                    <Camera size={16} />
+                    {scanStatus === 'reading'
+                      ? 'Scanning…'
+                      : hasKey
+                        ? 'Scan till slip'
+                        : 'Scan till slip (add API key in Settings)'}
+                  </button>
+                  {scanStatus === 'done' && (
+                    <p style={{ fontSize: '12px', color: '#16A34A', textAlign: 'center', margin: '0' }}>
+                      ✓ Fields filled from receipt — check and adjust if needed
+                    </p>
+                  )}
+                  {scanStatus === 'error' && (
+                    <p style={{ fontSize: '12px', color: '#BE185D', textAlign: 'center', margin: '0' }}>
+                      {hasKey
+                        ? 'Could not read receipt — please fill in manually'
+                        : 'Add a Gemini API key in Settings to use this feature'}
+                    </p>
+                  )}
+                </>
+              );
+            })()}
             <div className="form-row form-row-2">
               <div>
                 <label className="field-label">Amount ({currency})</label>

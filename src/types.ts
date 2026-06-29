@@ -59,6 +59,7 @@ export interface Asset {
 export interface AppSettings {
   ownerName: string;
   currency: Currency;
+  geminiApiKey?: string;
 }
 
 export interface AppState {
