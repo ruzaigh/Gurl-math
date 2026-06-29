@@ -10,23 +10,41 @@ export interface ScannedReceipt {
 }
 
 export async function scanReceiptImage(file: File): Promise<ScannedReceipt> {
-  const result = await Tesseract.recognize(file, 'eng');
-  return parseReceiptText(result.data.text);
+  // Use a worker directly so we can pass rotateAuto — fixes sideways/upside-down photos
+  const worker = await Tesseract.createWorker('eng');
+  try {
+    const result = await worker.recognize(file, { rotateAuto: true });
+    return parseReceiptText(result.data.text);
+  } finally {
+    await worker.terminate();
+  }
 }
 
 function parseReceiptText(raw: string): ScannedReceipt {
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
 
-  // Amount — priority 1: line labelled TOTAL / TOTAAL / AMOUNT DUE
+  // Amount — priority 1: TOTAL / TOTAAL / AMOUNT DUE labelled line
   let amount: number | undefined;
   const totalLine = lines.find(l =>
     /\b(total|totaal|amount\s*due|balance\s*due|subtotal)\b/i.test(l)
   );
   if (totalLine) {
-    const m = totalLine.match(/(\d[\d\s]*[.,]\d{2})/);
-    if (m) amount = parseFloat(m[1].replace(/\s/g, '').replace(',', '.'));
+    // Match R-prefixed (SA Rand) or bare decimal amounts
+    const m = totalLine.match(/R\s*(\d[\d\s]*[.,]\d{2})|(\d[\d\s]*[.,]\d{2})/i);
+    if (m) {
+      const raw = (m[1] ?? m[2]).replace(/\s/g, '').replace(',', '.');
+      amount = parseFloat(raw);
+    }
   }
-  // Amount — priority 2: largest currency-formatted number in the text
+  // Amount — priority 2: largest R-prefixed amount anywhere in the text
+  if (!amount) {
+    const rNums: number[] = [];
+    for (const m of raw.matchAll(/R\s*(\d{1,6}[.,]\d{2})/gi)) {
+      if (m[1]) rNums.push(parseFloat(m[1].replace(',', '.')));
+    }
+    if (rNums.length) amount = Math.max(...rNums);
+  }
+  // Amount — priority 3: largest bare decimal number in the text
   if (!amount) {
     const nums: number[] = [];
     for (const m of raw.matchAll(/(\d{1,6}[.,]\d{2})/g)) {
@@ -35,28 +53,41 @@ function parseReceiptText(raw: string): ScannedReceipt {
     if (nums.length) amount = Math.max(...nums);
   }
 
-  // Date — DD/MM/YYYY common on SA receipts, fallback YYYY-MM-DD
+  // Date — DD/MM/YYYY or DD-MM-YYYY (common on SA receipts)
   let date: string | undefined;
   const d1 = raw.match(/\b(\d{2})[/\-.](\d{2})[/\-.](\d{4})\b/);
   if (d1) {
     const candidate = `${d1[3]}-${d1[2]}-${d1[1]}`;
     if (!isNaN(Date.parse(candidate))) date = candidate;
   }
+  // Date — DD Mon YYYY (e.g. "19 Jun 2026")
   if (!date) {
-    const d2 = raw.match(/\b(\d{4})[/-](\d{2})[/-](\d{2})\b/);
+    const d2 = raw.match(/\b(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{4})\b/i);
     if (d2) {
-      const candidate = `${d2[1]}-${d2[2]}-${d2[3]}`;
+      const candidate = new Date(`${d2[2]} ${d2[1]} ${d2[3]}`).toISOString().slice(0, 10);
+      if (!isNaN(Date.parse(candidate))) date = candidate;
+    }
+  }
+  // Date — YYYY-MM-DD ISO fallback
+  if (!date) {
+    const d3 = raw.match(/\b(\d{4})[/-](\d{2})[/-](\d{2})\b/);
+    if (d3) {
+      const candidate = `${d3[1]}-${d3[2]}-${d3[3]}`;
       if (!isNaN(Date.parse(candidate))) date = candidate;
     }
   }
 
-  // Note — first non-numeric line (likely the store / merchant name)
-  const note = lines.find(l => l.length >= 3 && !/^\d/.test(l));
+  // Note — first "clean" line: mostly letters/digits, < 30% special chars
+  const note = lines.find(l => {
+    if (l.length < 3 || /^\d/.test(l)) return false;
+    const specials = (l.match(/[^a-zA-Z0-9\s&'.,-]/g) ?? []).length;
+    return specials / l.length < 0.3;
+  });
 
-  // Category — keyword match on the note
+  // Category — search all text for keywords, not just the note
+  const kw = raw.toLowerCase();
   let category: ExpenseCategory | undefined;
-  const kw = (note ?? '').toLowerCase();
-  if (/pick\s*n\s*pay|woolworths|checkers|spar|shoprite|food|grocer|bakery|butcher|kfc|mcdonald|steers|nandos|spur|wimpy|pizza|sushi|restaurant|cafe/.test(kw))
+  if (/pick\s*n\s*pay|woolworths|checkers|spar|shoprite|steers|kfc|mcdonald|nandos|spur|wimpy|pizza|sushi|restaurant|cafe|bakery|butcher|grocer|food\s*court/.test(kw))
     category = 'Food';
   else if (/uber|bolt|taxi|petrol|engen|shell|bp|caltex|fuel|motor|garage|park/.test(kw))
     category = 'Transport';
