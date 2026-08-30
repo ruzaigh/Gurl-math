@@ -5,17 +5,19 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   BarChart, Bar, XAxis, YAxis,
 } from 'recharts';
-import type { AppState } from '../types';
+import type { AppState, Page } from '../types';
 import { fmt, greeting, thisMonth, displayDate, EXPENSE_COLORS } from '../utils';
-import { ArrowDownLeft, ArrowUpRight, Wallet, TrendingUp } from 'lucide-react';
+import { paymentsLeft, thisMonthKey } from '../recurring';
+import { ArrowDownLeft, ArrowUpRight, Wallet, TrendingUp, Scissors, ChevronRight } from 'lucide-react';
 
 interface Props {
   state: AppState;
   update: (partial: Partial<AppState>) => void;
+  onNavigate?: (page: Page) => void;
 }
 
-export function Overview({ state }: Props) {
-  const { settings, accounts, assets, received, expenses, moves } = state;
+export function Overview({ state, onNavigate }: Props) {
+  const { settings, accounts, assets, received, expenses, moves, recurring } = state;
   const { currency } = settings;
   const month = thisMonth();
   const [actPage, setActPage] = useState(1);
@@ -62,6 +64,16 @@ export function Overview({ state }: Props) {
 
     return { netWorth, totalSavings, totalAssets, totalReceived, totalSpent, leftOver, donutData, barData, activity };
   }, [accounts, assets, received, expenses, moves, month]);
+
+  const recurringStats = useMemo(() => {
+    const nowKey = thisMonthKey();
+    const total = recurring.reduce((s, r) => s + r.amount, 0);
+    const cuttableNow = recurring
+      .filter(r => paymentsLeft(r, nowKey) === 0)
+      .reduce((s, r) => s + r.amount, 0);
+    const marked = recurring.filter(r => r.markedForCut).reduce((s, r) => s + r.amount, 0);
+    return { total, cuttableNow, marked };
+  }, [recurring]);
 
   return (
     <div className="fade-in">
@@ -173,6 +185,37 @@ export function Overview({ state }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Recurring / cut-back teaser */}
+      {recurring.length > 0 && (
+        <div
+          className="card"
+          style={{ marginBottom: '20px', cursor: onNavigate ? 'pointer' : 'default' }}
+          onClick={() => onNavigate?.('recurring')}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <Scissors size={15} color="#16A34A" />
+            <p style={{ fontSize: '14px', fontWeight: 600, flex: 1 }}>Recurring &amp; cut back</p>
+            {onNavigate && <ChevronRight size={16} color="#94A3B8" />}
+          </div>
+          <div style={{ display: 'flex', gap: '28px', flexWrap: 'wrap' }}>
+            <div>
+              <p style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Goes out monthly</p>
+              <p className="money-text" style={{ fontSize: '19px', fontWeight: 800 }}>{fmt(recurringStats.total, currency)}</p>
+            </div>
+            <div>
+              <p style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Cuttable today</p>
+              <p className="money-text" style={{ fontSize: '19px', fontWeight: 800, color: '#16A34A' }}>{fmt(recurringStats.cuttableNow, currency)}</p>
+            </div>
+            {recurringStats.marked > 0 && (
+              <div>
+                <p style={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>Marked to cut</p>
+                <p className="money-text" style={{ fontSize: '19px', fontWeight: 800, color: '#2563EB' }}>{fmt(recurringStats.marked, currency)}/mo</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Recent Activity */}
       <div className="card">

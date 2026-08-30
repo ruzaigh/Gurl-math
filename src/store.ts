@@ -10,6 +10,7 @@ const DEFAULT: AppState = {
   received: [],
   expenses: [],
   assets: [],
+  recurring: [],
 };
 
 function load(): AppState {

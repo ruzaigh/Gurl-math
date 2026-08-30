@@ -4,6 +4,7 @@ import { Overview } from './pages/Overview';
 import { Savings } from './pages/Savings';
 import { Received } from './pages/Received';
 import { Expenses } from './pages/Expenses';
+import { CutBack } from './pages/CutBack';
 import { Assets } from './pages/Assets';
 import { Settings } from './pages/Settings';
 import type { Page } from './types';
@@ -12,6 +13,7 @@ import {
   PiggyBank,
   ArrowDownLeft,
   CreditCard,
+  Scissors,
   Gem,
   Settings as SettingsIcon,
 } from 'lucide-react';
@@ -22,6 +24,7 @@ const NAV: { id: Page; label: string; Icon: React.ElementType }[] = [
   { id: 'savings',  label: 'Savings',  Icon: PiggyBank },
   { id: 'received', label: 'Received', Icon: ArrowDownLeft },
   { id: 'expenses', label: 'Expenses', Icon: CreditCard },
+  { id: 'recurring', label: 'Cut Back', Icon: Scissors },
   { id: 'assets',   label: 'Assets',   Icon: Gem },
   { id: 'settings', label: 'Settings', Icon: SettingsIcon },
 ];
@@ -58,10 +61,11 @@ export default function App() {
 
       {/* Main content */}
       <main className="main-content">
-        {page === 'overview' && <Overview {...props} />}
+        {page === 'overview' && <Overview {...props} onNavigate={setPage} />}
         {page === 'savings'  && <Savings  {...props} />}
         {page === 'received' && <Received {...props} />}
         {page === 'expenses' && <Expenses {...props} />}
+        {page === 'recurring' && <CutBack {...props} />}
         {page === 'assets'   && <Assets   {...props} />}
         {page === 'settings' && <Settings {...props} />}
       </main>

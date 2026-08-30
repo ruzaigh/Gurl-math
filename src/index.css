@@ -345,6 +345,16 @@ select.field-input { cursor: pointer; }
   .chart-grid { grid-template-columns: 1fr; }
 }
 
+/* 7 nav items need to breathe on narrow phones */
+@media (max-width: 420px) {
+  .bottom-nav-item {
+    min-width: 0;
+    padding: 4px 2px;
+    font-size: 9px;
+    gap: 2px;
+  }
+}
+
 @media (max-width: 480px) {
   .form-row-2 { grid-template-columns: 1fr; }
   .modal-box { padding: 20px; }
