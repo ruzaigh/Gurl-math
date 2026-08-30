@@ -48,6 +48,27 @@ export interface ExpenseEntry {
   payFromId?: string;
 }
 
+/** 'flexible' = cancel today, money is yours next month.
+ *  'contract'  = you are still legally on the hook until endMonth. */
+export type Commitment = 'flexible' | 'contract';
+
+export interface RecurringExpense {
+  id: string;
+  name: string;
+  /** What it costs every month. */
+  amount: number;
+  category: ExpenseCategory;
+  commitment: Commitment;
+  /** 'YYYY-MM' — the last month you still have to pay. Only for contracts. */
+  endMonth?: string;
+  /** She has decided this one is going. Drives every projection on the page. */
+  markedForCut: boolean;
+  /** Savings account the freed money is earmarked for. */
+  intoAccountId?: string;
+  /** 'YYYY-MM' of the last month this was logged as a real expense. */
+  lastLoggedMonth?: string;
+}
+
 export interface Asset {
   id: string;
   name: string;
@@ -69,6 +90,7 @@ export interface AppState {
   received: ReceivedEntry[];
   expenses: ExpenseEntry[];
   assets: Asset[];
+  recurring: RecurringExpense[];
 }
 
-export type Page = 'overview' | 'savings' | 'received' | 'expenses' | 'assets' | 'settings';
+export type Page = 'overview' | 'savings' | 'received' | 'expenses' | 'recurring' | 'assets' | 'settings';
